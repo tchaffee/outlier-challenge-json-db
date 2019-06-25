@@ -12,6 +12,13 @@ app.use(bodyParser.json())
 
 app.get('/health', api.getHealth)
 
+// TODO: Want to use '+' for one or more :propertyName, but only splat is working.
+// Might be looking at more recent docs for path-to-regexp than Express uses?
+app.route('/:studentId/:propertyName*')
+  .get(api.getStudentProperty)
+  .put(api.setStudentProperty)
+  .delete(api.deleteStudentProperty)
+
 app.use(middleware.handleError)
 app.use(middleware.notFound)
 
