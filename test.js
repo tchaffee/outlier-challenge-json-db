@@ -8,15 +8,19 @@ const server = require('./server')
 
 // Hard-code to localhost to avoid accidentally hitting production endpoints.
 const endpoint = `http://localhost:${port}`
-const dataDir = path.join(__dirname, './test-data')
 const studentId = 'delete-me'
-const jsonFile = `${dataDir}/${studentId}.json`
 const testStudent = {
   name: 'Test student - can be deleted if found',
   address: {
-    streetName: 'Rua Road',
-    streetNumber: 67
-  }
+    street: {
+      name: 'Rua Road',
+      number: 67
+    }
+  },
+  iAmFalsy: false,
+  iAmNull: null,
+  iAmNaN: NaN,
+  iAmUndefined: undefined
 }
 
 tape('health', async function (t) {
@@ -30,63 +34,66 @@ tape('health', async function (t) {
 
 // PUT endpoints
 
-tape('PUT /:studentId/:propertyName sets a property', async function (t) {
+tape('PUT /:studentId/:propertyName sets a property with data', async function (t) {
   const url = `${endpoint}/${studentId}/address`
-  const streetName = 'Cool St.'
-  const streetNumber = 25
   const data = {
-    streetName: streetName,
-    streetNumber: streetNumber
+    streetName: 'Cool St.',
+    streetNumber: 25
   }
 
-  createTestStudentFile()
+  deleteCreateTestStudent()
 
-  jsonist.put(url, data, (err, body, resp) => {
+  jsonist.put(url, data, (err, body, res) => {
     let updatedStudent
     if (err) t.error(err)
-    t.ok(resp.statusCode === 204, 'http resonse status code should be 204')
+    t.equal(res.statusCode, 204, 'http resonse status code should be 204')
     updatedStudent = getTestStudentFromFile()
-    t.ok(updatedStudent.address.streetName === streetName, 'street name should be equal')
-    t.ok(updatedStudent.address.streetNumber === streetNumber, 'street number should be equal')
+    t.deepEqual(updatedStudent.address, data, 'address should be equal')
     t.end()
   })
 })
 
 tape('PUT /:studentId/:propertyName/:propertyName sets a nested property', async function (t) {
-  const url = `${endpoint}/${studentId}/address/streetNumber`
-  const data = 26
+  const url = `${endpoint}/${studentId}/foo/bar/baz`
+  const data = {
+    fizz: 44
+  }
 
-  createTestStudentFile()
+  deleteCreateTestStudent()
 
-  jsonist.put(url, data, (err, body, resp) => {
+  jsonist.put(url, data, (err, body, res) => {
     let updatedStudent
     if (err) t.error(err)
-    t.ok(resp.statusCode === 204, 'http resonse status code should be 204')
+    t.equal(res.statusCode, 204, 'http resonse status code should be 204')
     updatedStudent = getTestStudentFromFile()
-    t.ok(updatedStudent.address.streetNumber === data, 'street number should be equal to data sent')
+    t.deepEqual(updatedStudent.foo.bar.baz, data, 'nested property data should be equal to data sent')
     t.end()
   })
 })
 
 tape('PUT /:studentId/:propertyName creates a property if it does not exist', async function (t) {
   const url = `${endpoint}/${studentId}/age`
-  const data = 'might change soon'
+  const data = {
+    current: 'might change soon'
+  }
 
-  createTestStudentFile()
+  deleteCreateTestStudent()
 
-  jsonist.put(url, data, (err, body, resp) => {
+  jsonist.put(url, data, (err, body, res) => {
     let updatedStudent
     if (err) t.error(err)
-    t.ok(resp.statusCode === 204, 'http response status code should be 204')
+    t.equal(res.statusCode, 204, 'http resonse status code should be 204')
     updatedStudent = getTestStudentFromFile()
-    t.ok(updatedStudent.age === data, 'age should be equal to data sent')
+    t.deepEqual(updatedStudent.age, data, 'age should be equal to data sent')
     t.end()
   })
 })
 
 tape('PUT /:studentId/:propertyName creates a student json file if it does not exist', async function (t) {
   const url = `${endpoint}/${studentId}/grade`
-  const data = '80% for 100% of the time'
+  const data = {
+    score: '80% for 100% of the time'
+  }
 
   deleteTestStudentFile()
 
@@ -101,11 +108,13 @@ tape('PUT /:studentId/:propertyName creates a student json file if it does not e
 
 tape('GET /:studentId/:propertyName retrieves a student property', async function (t) {
   const url = `${endpoint}/${studentId}/address`
-  createTestStudentFile()
-  jsonist.get(url, (err, body, resp) => {
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
     if (err) t.error(err)
-    t.ok(resp.statusCode === 200, 'http response code should be 200')
-    t.ok(body && body.streetNumber === testStudent.address.streetNumber, 'street number should be equal')
+    t.equal(res.statusCode, 200, 'http resonse code should be 200')
+    t.deepEqual(body, testStudent.address, 'address should be equal')
     t.end()
   })
 })
@@ -113,32 +122,92 @@ tape('GET /:studentId/:propertyName retrieves a student property', async functio
 // NOTE: The test will pass even when the endpoint does not exist.
 tape('GET /:studentId/:propertyName returns 404 if the property does not exist', async function (t) {
   const url = `${endpoint}/${studentId}/nopenope`
-  createTestStudentFile()
-  jsonist.get(url, (err, body, resp) => {
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
     if (err) t.error(err)
-    t.ok(resp.statusCode === 404, 'http response status code should be 404')
+    t.equal(res.statusCode, 404, 'http resonse status code should be 404')
     t.end()
   })
 })
 
-// NOTE: The test will pass even when the endpoint does not exist.
+// NOTE: The test will pass even when the endpoint does not exist. Which is ok.
 tape('GET /:studentId/:propertyName returns 404 if the student file does not exist', async function (t) {
   const url = `${endpoint}/${studentId}/address`
+
   deleteTestStudentFile()
-  jsonist.get(url, (err, body, resp) => {
+
+  jsonist.get(url, (err, body, res) => {
     if (err) t.error(err)
-    t.ok(resp.statusCode === 404, 'http response status code should be 404')
+    t.equal(res.statusCode, 404, 'http resonse status code should be 404')
     t.end()
   })
 })
 
 tape('GET /:studentId/:propertyName/:propertyName retrieves a nested property', async function (t) {
-  const url = `${endpoint}/${studentId}/address/streetName`
-  createTestStudentFile()
-  jsonist.get(url, (err, body, resp) => {
+  const url = `${endpoint}/${studentId}/address/street/name/`
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
     if (err) t.error(err)
-    t.ok(resp.statusCode === 200, 'http response code should be 200')
-    t.ok(body === testStudent.address.streetName, 'street name should be equal')
+    t.equal(res.statusCode, 200, 'http resonse code should be 200')
+    t.equal(body, testStudent.address.street.name, 'street name should be equal')
+    t.end()
+  })
+})
+
+// GET edge cases to make sure falsy type stuff doesn't break the API.
+
+tape('GET /:studentId/:propertyName/:propertyName retrieves a false property value', async function (t) {
+  const url = `${endpoint}/${studentId}/iAmFalsy`
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
+    if (err) t.error(err)
+    t.equal(res.statusCode, 200, 'http resonse code should be 200')
+    t.equal(body, false, 'false is retrieved for false property value')
+    t.end()
+  })
+})
+
+tape('GET /:studentId/:propertyName/:propertyName retrieves a null property value', async function (t) {
+  const url = `${endpoint}/${studentId}/iAmNull`
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
+    if (err) t.error(err)
+    t.equal(res.statusCode, 200, 'http resonse code should be 200')
+    t.equal(body, null, 'null is retrieved for null property value')
+    t.end()
+  })
+})
+
+tape('GET /:studentId/:propertyName/:propertyName retrieves a NaN property value as null', async function (t) {
+  const url = `${endpoint}/${studentId}/iAmNaN`
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
+    if (err) t.error(err)
+    t.equal(res.statusCode, 200, 'http resonse code should be 200')
+    t.equal(body, null, 'null is retrieved for NaN property value')
+    t.end()
+  })
+})
+
+// JSON.stringify won't store the property in the first place.
+tape('GET /:studentId/:propertyName/:propertyName returns 404 for a property with a value of undefined', async function (t) {
+  const url = `${endpoint}/${studentId}/iAmUndefined`
+
+  deleteCreateTestStudent()
+
+  jsonist.get(url, (err, body, res) => {
+    if (err) t.error(err)
+    t.equal(res.statusCode, 404, 'http resonse code should be 404')
     t.end()
   })
 })
@@ -148,12 +217,12 @@ tape('GET /:studentId/:propertyName/:propertyName retrieves a nested property', 
 tape('DELETE /:studentId/:propertyName deletes a student property', async function (t) {
   const url = `${endpoint}/${studentId}/address`
 
-  createTestStudentFile()
+  deleteCreateTestStudent()
 
-  jsonist.delete(url, (err, body, resp) => {
+  jsonist.delete(url, (err, body, res) => {
     let updatedStudent
     if (err) t.error(err)
-    t.ok(resp.statusCode === 204, 'http response status code should be 204')
+    t.equal(res.statusCode, 204, 'http resonse status code should be 204')
     updatedStudent = getTestStudentFromFile()
     t.notOk(updatedStudent.hasOwnProperty('address'), 'updated student file should not have address property')
     t.end()
@@ -161,64 +230,85 @@ tape('DELETE /:studentId/:propertyName deletes a student property', async functi
 })
 
 tape('DELETE /:studentId/:propertyName/:propertyName deletes a nested property', async function (t) {
-  const url = `${endpoint}/${studentId}/address/streetNumber`
+  const url = `${endpoint}/${studentId}/address/street/number`
 
-  createTestStudentFile()
+  deleteCreateTestStudent()
 
-  jsonist.delete(url, (err, body, resp) => {
+  jsonist.delete(url, (err, body, res) => {
     let updatedStudent
     if (err) t.error(err)
-    t.ok(resp.statusCode === 204, 'http response status code should be 204')
+    t.equal(res.statusCode, 204, 'http resonse status code should be 204')
     updatedStudent = getTestStudentFromFile()
-    t.notOk(updatedStudent.address.hasOwnProperty('streetNumber'), 'updated student file should not have deleted street number property')
+    t.notOk(updatedStudent.address.street.hasOwnProperty('number'), 'updated student file should not have deleted street number property')
     t.end()
   })
 })
 
-// NOTE: The test will pass even when the endpoint does not exist.
+// NOTE: The test will pass even when the endpoint does not exist. Which is ok.
 tape('DELETE /:studentId/:propertyName returns 404 if the property does not exist', async function (t) {
   const url = `${endpoint}/${studentId}/nopenope`
-  createTestStudentFile()
-  jsonist.delete(url, (err, body, resp) => {
+
+  deleteCreateTestStudent()
+
+  jsonist.delete(url, (err, body, res) => {
     if (err) t.error(err)
-    t.ok(resp.statusCode === 404, 'http response status code should be 404')
+    t.equal(res.statusCode, 404, 'http resonse status code should be 404')
     t.end()
   })
 })
 
-// NOTE: The test will pass even when the endpoint does not exist.
+// NOTE: The test will pass even when the endpoint does not exist. Which is ok.
 tape('DELETE /:studentId/:propertyName returns 404 if the student file does not exist', async function (t) {
   const url = `${endpoint}/${studentId}/address`
+
   deleteTestStudentFile()
-  jsonist.delete(url, (err, body, resp) => {
+
+  jsonist.delete(url, (err, body, res) => {
     if (err) t.error(err)
-    t.ok(resp.statusCode === 404, 'http response status code should be 404')
+    t.equal(res.statusCode, 404, 'http resonse status code should be 404')
     t.end()
   })
 })
 
 // Support functions
 
-function createTestStudentFile () {
+function getTestFileDir () {
+  // Hard code the directory for tests. Configurable for the API though.
+  // Ensures tests can't be configured to touch production data.
+  return path.join(__dirname, './test-data')
+}
+
+function getTestFilePath () {
+  return `${getTestFileDir()}/${studentId}.json`
+}
+
+function deleteCreateTestStudent () {
   deleteTestStudentFile()
-  fs.writeFileSync(jsonFile, JSON.stringify(testStudent))
+  createTestStudentFile()
+}
+
+function createTestStudentFile () {
+  // Create the directory if needed.
+  if (!fs.existsSync(getTestFileDir())) fs.mkdirSync(getTestFileDir())
+  fs.writeFileSync(getTestFilePath(), JSON.stringify(testStudent))
 }
 
 function doesStudentFileExist () {
-  return fs.existsSync(jsonFile)
+  return fs.existsSync(getTestFilePath())
 }
 
 function getTestStudentFromFile () {
-  const student = JSON.parse(fs.readFileSync(jsonFile))
+  const student = JSON.parse(fs.readFileSync(getTestFilePath()))
   return student
 }
 
 function deleteTestStudentFile () {
   try {
-    fs.unlinkSync(jsonFile)
+    fs.unlinkSync(getTestFilePath())
   } catch (err) {
     // File does not exist is fine
-    if ((err.errno !== -2) || (err.code !== 'ENOENT')) throw err
+    if ((err.errno === -2) && (err.code === 'ENOENT')) return
+    throw err
   }
 }
 
@@ -226,5 +316,6 @@ function deleteTestStudentFile () {
 
 tape('cleanup', function (t) {
   server.close()
+  deleteTestStudentFile()
   t.end()
 })
